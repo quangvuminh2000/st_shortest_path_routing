@@ -20,8 +20,22 @@ START_COORDINATES = map_conf["map_settings"]["start_coordinates"]
 END_COORDINATES = map_conf["map_settings"]["end_coordinates"]
 
 
-def create_map():
+def create_map(last_click=None):
     folium_map = folium.Map(location=INITIAL_COORDINATES, zoom_start=INITIAL_ZOOM)
+
+    # Add a click event to the map
+    folium.LatLngPopup().add_to(
+        folium_map
+    )  # This will show the latitude and longitude of clicks
+
+    # If there are last click coordinates, add a marker at that location
+    if last_click:
+        folium.Marker(
+            location=[last_click["lat"], last_click["lng"]],
+            popup=f"Clicked Location: {last_click['lat']}, {last_click['lng']}",
+            icon=folium.Icon(color="blue"),
+        ).add_to(folium_map)
+
     return folium_map
 
 
