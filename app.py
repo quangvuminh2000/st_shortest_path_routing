@@ -18,11 +18,19 @@ from src import (
     INITIAL_ALGORITHM,
     START_COORDINATES,
     END_COORDINATES,
-    bellman_ford,
-    floyd_warshall,
+    yen_algorithm,
+    # floyd_warshall,
+    # bellman_ford,
 )
 from src.utils import getKNN
-from src.algo import dijkstra
+from src.algo import (
+    dijkstra,
+    bellman_ford,
+    single_source_bellman_ford,
+    floyd_warshall_improved,
+    yen_k_shortest_paths,
+    k_shortest_paths,
+)
 
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -34,6 +42,8 @@ st.set_page_config(
     page_icon=":world_map:",
     layout="wide",
 )
+
+COLORS = ["blue", "green", "red", "yellow", "purple"]
 
 # * Starting variables
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -64,6 +74,9 @@ if "target" not in st.session_state:
 
 if "algorithm" not in st.session_state:
     st.session_state["algorithm"] = INITIAL_ALGORITHM
+
+if "k_shortest" not in st.session_state:
+    st.session_state["k_shortest"] = 3
 
 # * Helper functions
 
@@ -169,8 +182,14 @@ with st.sidebar:
         with st.container(key="algo_selection_container"):
             algorithm = st.selectbox(
                 "Choose the algorithm:",
-                options=["Dijkstra", "Bellman-Ford", "Floyd-Warshall"],
+                options=["Dijkstra", "Bellman-Ford", "Floyd-Warshall", "Yen"],
                 key="algo_selection_box",
+            )
+            k_shortest = st.select_slider(
+                "Choose the number of shortest paths (Yen's algorithm):",
+                help="This setting is only work for Yen's algorithm",
+                options=list(range(1, 6)),
+                key="k_shortest_select_slider",
             )
 
         # Submit the selection of settings
@@ -181,14 +200,15 @@ with st.sidebar:
                 st.session_state["source"] = st.session_state["start_last_clicked"]
                 st.session_state["target"] = st.session_state["end_last_clicked"]
                 st.session_state["algorithm"] = algorithm
+                st.session_state["k_shortest"] = k_shortest
 
 
 @st.cache_data
 def load_graph_data():
     nodes = pd.read_csv(
-        os.path.join(SCRIPT_DIR, "./data/full_node_list.csv"), index_col=0
+        os.path.join(SCRIPT_DIR, "./data/primary_node_list.csv"), index_col=0
     )
-    edges = pd.read_csv(os.path.join(SCRIPT_DIR, "./data/full_edge_list.csv"))
+    edges = pd.read_csv(os.path.join(SCRIPT_DIR, "./data/primary_edge_list.csv"))
     graph = build_graph(nodes, edges)
 
     node_dict = nodes[["y", "x"]].to_dict(orient="index")
@@ -202,7 +222,7 @@ with st.spinner("Loading data..."):
 st.success(f"Completely load data of {len(nodes)} nodes and {len(edges)} edges~~")
 
 
-def run_algorithm(algorithm_name, points):
+def run_algorithm(algorithm_name, points, k=3):
     start, end = points[0], points[1]
 
     nearest_start, nearest_start_loc = getKNN(start, node_dict, nodes)
@@ -217,9 +237,62 @@ def run_algorithm(algorithm_name, points):
             dir_graph, nearest_start, nearest_end
         )
     elif algorithm_name == "Bellman-Ford":
-        path_length, vertices = bellman_ford(dir_graph, nearest_start, nearest_end)
+        path_length, vertices, duration = single_source_bellman_ford(
+            dir_graph, nearest_start, nearest_end, weight="weight"
+        )
     elif algorithm_name == "Floyd-Warshall":
-        path_length, vertices = floyd_warshall(dir_graph, nearest_start, nearest_end)
+        path_length, vertices, duration = floyd_warshall_improved(
+            dir_graph, nearest_start, nearest_end
+        )
+    elif algorithm_name == "Yen":
+        # costs, paths, duration = k_shortest_paths(
+        #     dir_graph, nearest_start, nearest_end, k
+        # )
+        # paths = [
+        #     [start]
+        #     + [
+        #         (float(node_dict[int(node)]["y"]), float(node_dict[(int(node))]["x"]))
+        #         for node in path
+        #     ]
+        #     + [end]
+        #     for path in paths
+        # ]
+
+        # costs = [distance_start + cost + distance_end for cost in costs]
+        # return costs, paths, duration
+        paths, duration = yen_algorithm(dir_graph, nearest_start, nearest_end, k)
+        paths = [
+            [start]
+            + [
+                (float(node_dict[int(node)]["y"]), float(node_dict[(int(node))]["x"]))
+                for node in path
+            ]
+            + [end]
+            for path in paths
+        ]
+
+        path_costs = [
+            sum(haversine(u, v, unit=Unit.METERS) for (u, v) in zip(path, path[1:]))
+            for path in paths
+        ]
+
+        costs = [distance_start + cost + distance_end for cost in path_costs]
+        return costs, paths, duration
+        # cost_paths, duration = yen_k_shortest_paths(
+        #     dir_graph, nearest_start, nearest_end, k
+        # )
+
+        # costs = [distance_start + cost + distance_end for cost, _ in cost_paths]
+        # paths = [
+        #     [start]
+        #     + [
+        #         (float(node_dict[int(node)]["y"]), float(node_dict[(int(node))]["x"]))
+        #         for node in path
+        #     ]
+        #     + [end]
+        #     for _, path in cost_paths
+        # ]
+        # return costs, paths, duration
 
     coordinates = (
         [start]
@@ -230,7 +303,7 @@ def run_algorithm(algorithm_name, points):
         + [end]
     )
 
-    return path_length + distance_start + distance_end, coordinates
+    return path_length + distance_start + distance_end, coordinates, duration
 
 
 # * Map calculation
@@ -238,31 +311,56 @@ st.write("Source:", st.session_state["source"])
 st.write("Target:", st.session_state["target"])
 st.write("Algorithm:", st.session_state["algorithm"])
 
-with st.spinner("Building map..."):
+with st.spinner("Building map and calculate shortest path..."):
     try:
-        distance, coordinates = run_algorithm(
+        distance, coordinates, duration = run_algorithm(
             st.session_state["algorithm"],
             [st.session_state["source"], st.session_state["target"]],
+            st.session_state["k_shortest"],
         )
-        km_distance = int(distance) // 1000
-        remain_m_distance = distance - km_distance * 1000
-        st.write(f"Shortest path: :blue[{km_distance}km {remain_m_distance:.4f}m]")
         solution_map = create_map()
-        # Start/End Markers
-        folium.Marker(
-            coordinates[0], popup="Start", icon=folium.Icon(color="blue")
-        ).add_to(solution_map)
-        folium.Marker(
-            coordinates[-1], popup="End", icon=folium.Icon(color="red")
-        ).add_to(solution_map)
 
         # Shortest path line
-        folium.PolyLine(
-            coordinates,
-            color="blue",
-            weight=5,
-            tooltip=f"Path Length: {distance:.4f} meters",
-        ).add_to(solution_map)
+        if st.session_state["algorithm"] != "Yen":
+            km_distance = int(distance) // 1000
+            remain_m_distance = distance - km_distance * 1000
+            st.write(f"Shortest path: :blue[{km_distance}km {remain_m_distance:.4f}m]")
+            st.write(f"Found in: :blue[{duration:.2f}s]")
+            folium.PolyLine(
+                coordinates,
+                color="blue",
+                weight=5,
+                tooltip=f"Path Length: {distance:.4f} meters",
+            ).add_to(solution_map)
+            folium.Marker(
+                coordinates[0], popup="Start", icon=folium.Icon(color="blue")
+            ).add_to(solution_map)
+            folium.Marker(
+                coordinates[-1], popup="End", icon=folium.Icon(color="red")
+            ).add_to(solution_map)
+        elif st.session_state["algorithm"] == "Yen":
+            for i, dist in enumerate(distance):
+                km_dist = int(dist) // 1000
+                remain_m_dist = dist - km_dist * 1000
+                st.write(
+                    f"Shortest path {i+1}th: :blue[{km_dist}km {remain_m_dist:.4f}m]"
+                )
+
+            st.write(f"Found in: :blue[{duration:.2f}s]")
+            folium.Marker(
+                coordinates[0][0], popup="Start", icon=folium.Icon(color="blue")
+            ).add_to(solution_map)
+            folium.Marker(
+                coordinates[0][-1], popup="End", icon=folium.Icon(color="red")
+            ).add_to(solution_map)
+
+            for i, coord in enumerate(coordinates):
+                folium.PolyLine(
+                    coord,
+                    color=COLORS[i],
+                    weight=5,
+                    tooltip=f"Path Length: {distance[i]:.4f} meters",
+                ).add_to(solution_map)
         folium_static(solution_map, width=MAP_WIDTH, height=MAP_HEIGHT)
     except NetworkXNoPath as er:
         st.write(":red[Isolated points found, cannot go anywhere]")

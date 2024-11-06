@@ -1,3 +1,6 @@
+import networkx as nx
+
+
 def get_shortest_path(end, predecessor):  # Dijkstra, Bellman-ford
     path = []
     current_node = end
@@ -18,3 +21,31 @@ def get_path(start, end, predecessor, node_index, index_node):  # Floyd-warshall
     final_path = [index_node[i] for i in path]
 
     return final_path
+
+
+def _build_paths_from_predecessors(sources, target, pred):
+    if target not in pred:
+        raise nx.NetworkXNoPath(f"Target {target} cannot be reached from given sources")
+
+    seen = {target}
+    stack = [[target, 0]]
+    top = 0
+    while top >= 0:
+        node, i = stack[top]
+        if node in sources:
+            yield [p for p, n in reversed(stack[: top + 1])]
+        if len(pred[node]) > i:
+            stack[top][1] = i + 1
+            next = pred[node][i]
+            if next in seen:
+                continue
+            else:
+                seen.add(next)
+            top += 1
+            if top == len(stack):
+                stack.append([next, 0])
+            else:
+                stack[top][:] = [next, 0]
+        else:
+            seen.discard(node)
+            top -= 1
