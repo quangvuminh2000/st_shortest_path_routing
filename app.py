@@ -46,6 +46,8 @@ with open(app_conf_path) as conf_file:
 # Extract app settings
 MAP_HEIGHT = app_conf["app_settings"]["map"]["height"]
 MAP_WIDTH = app_conf["app_settings"]["map"]["width"]
+MAP_SIDEBAR_HEIGHT = app_conf["app_settings"]["map"]["sidebar"]["height"]
+MAP_SIDEBAR_WIDTH = app_conf["app_settings"]["map"]["sidebar"]["width"]
 
 # * State variables
 if "start_last_clicked" not in st.session_state:
@@ -91,8 +93,8 @@ with st.sidebar:
             start_map_state_change = st_folium(
                 start_map,
                 key="start_map",
-                height=310,  # app_settings->map->sidebar->height
-                width=290,  # app_settings->map->sidebar->weight
+                height=MAP_SIDEBAR_HEIGHT,
+                width=MAP_SIDEBAR_WIDTH,
                 returned_objects=["last_clicked"],
             )
 
@@ -131,8 +133,8 @@ with st.sidebar:
             end_map_state_change = st_folium(
                 end_map,
                 key="end_map",
-                height=310,  # app_settings->map->sidebar->height
-                width=290,  # app_settings->map->sidebar->weight
+                height=MAP_SIDEBAR_HEIGHT,
+                width=MAP_SIDEBAR_WIDTH,
                 returned_objects=["last_clicked"],
             )
 
@@ -250,7 +252,7 @@ with st.spinner("Building map..."):
             weight=5,
             tooltip=f"Path Length: {distance:.4f} meters",
         ).add_to(solution_map)
-        folium_static(solution_map, width=800, height=600)
+        folium_static(solution_map, width=MAP_WIDTH, height=MAP_HEIGHT)
     except NetworkXNoPath as er:
         st.write(":red[Isolated points found, cannot go anywhere]")
         st.image(os.path.join(SCRIPT_DIR, "./img/error.png"))

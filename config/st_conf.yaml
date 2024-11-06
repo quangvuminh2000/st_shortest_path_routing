@@ -1,4 +1,7 @@
 app_settings:
   map:
-    width: 700
-    height: 700
+    width: 800
+    height: 600
+    sidebar:
+      width: 290
+      height: 310
