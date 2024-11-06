@@ -7,3 +7,4 @@ networkx
 pyyaml
 haversine
 scikit-learn
+tqdm

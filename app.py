@@ -18,11 +18,11 @@ from src import (
     INITIAL_ALGORITHM,
     START_COORDINATES,
     END_COORDINATES,
-    dijkstra,
     bellman_ford,
     floyd_warshall,
 )
 from src.utils import getKNN
+from src.algo import dijkstra
 
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -213,7 +213,9 @@ def run_algorithm(algorithm_name, points):
     print(f"Nearest start, end (meters): {distance_start:4f} {distance_end:4f}")
 
     if algorithm_name == "Dijkstra":
-        path_length, vertices = dijkstra(dir_graph, nearest_start, nearest_end)
+        path_length, vertices, duration = dijkstra(
+            dir_graph, nearest_start, nearest_end
+        )
     elif algorithm_name == "Bellman-Ford":
         path_length, vertices = bellman_ford(dir_graph, nearest_start, nearest_end)
     elif algorithm_name == "Floyd-Warshall":
