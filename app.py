@@ -246,6 +246,15 @@ with st.spinner("Building map..."):
         remain_m_distance = distance - km_distance * 1000
         st.write(f"Shortest path: :blue[{km_distance}km {remain_m_distance:.4f}m]")
         solution_map = create_map()
+        # Start/End Markers
+        folium.Marker(
+            coordinates[0], popup="Start", icon=folium.Icon(color="blue")
+        ).add_to(solution_map)
+        folium.Marker(
+            coordinates[-1], popup="End", icon=folium.Icon(color="red")
+        ).add_to(solution_map)
+
+        # Shortest path line
         folium.PolyLine(
             coordinates,
             color="blue",
